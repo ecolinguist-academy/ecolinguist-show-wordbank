@@ -2,7 +2,7 @@ import glob
 import pandas as pd
 import streamlit as st
 
-# ——— Robust loader that skips bad CSVs ———
+# ——— Robust loader that skips any malformed CSV ———
 @st.cache_data
 def load_wordbank():
     tables = []
@@ -13,12 +13,11 @@ def load_wordbank():
             st.warning(f"Could not read {path}: {e}")
             continue
 
-        # If fewer than 2 columns, skip
         if len(df.columns) < 2:
             st.warning(f"Skipped {path}: needs ≥2 columns (found {len(df.columns)})")
             continue
 
-        # Keep only first two columns and rename
+        # Only keep the first two columns, rename them
         df = df.iloc[:, :2]
         df.columns = ["Language", "Word"]
         tables.append(df)
@@ -27,19 +26,20 @@ def load_wordbank():
         return pd.concat(tables, ignore_index=True)
     return pd.DataFrame(columns=["Language", "Word"])
 
-# Load the wordbank
+
+# Load data
 df = load_wordbank()
 
-# ——— Page config & header ———
+# ——— Page config & title ———
 st.set_page_config(page_title="Ecolinguist Show Wordbank", layout="wide")
 st.title("📚 Ecolinguist Show Wordbank")
 st.markdown("Search words used in past episodes and avoid repetition.")
 
-# ——— Sidebar: language selection ———
+# ——— Sidebar: select language ———
 languages = sorted(df["Language"].unique())
 lang = st.sidebar.selectbox("🔤 Select language", languages)
 
-# ——— Main: word lookup UI ———
+# ——— Main: word lookup ———
 st.subheader(f"Check a word in **{lang}** episodes")
 query = st.text_input("Enter the word to check:")
 
@@ -54,7 +54,7 @@ if query:
     else:
         st.warning(f"❌ **'{query}'** has **not** been used yet.")
 
-# ——— Expander: full list for the selected language ———
+# ——— Expander: full list of words ———
 with st.expander(f"📖 All words in {lang}"):
     st.dataframe(
         df[df["Language"] == lang]
