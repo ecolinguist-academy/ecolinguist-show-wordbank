@@ -2,38 +2,44 @@ import glob
 import pandas as pd
 import streamlit as st
 
-# ——— Robust loader to skip bad CSVs ———
+# ——— Robust loader that skips bad CSVs ———
 @st.cache_data
 def load_wordbank():
     tables = []
     for path in glob.glob("data/*.csv"):
-        df = pd.read_csv(path)
-        # Skip files with fewer than 2 columns
-        if len(df.columns) < 2:
-            st.warning(f"Skipped {path}: needs ≥2 columns, found {len(df.columns)}")
+        try:
+            df = pd.read_csv(path)
+        except Exception as e:
+            st.warning(f"Could not read {path}: {e}")
             continue
-        # Keep only first two columns and standardize names
+
+        # If fewer than 2 columns, skip
+        if len(df.columns) < 2:
+            st.warning(f"Skipped {path}: needs ≥2 columns (found {len(df.columns)})")
+            continue
+
+        # Keep only first two columns and rename
         df = df.iloc[:, :2]
         df.columns = ["Language", "Word"]
         tables.append(df)
+
     if tables:
         return pd.concat(tables, ignore_index=True)
-    # Fallback to empty DataFrame
     return pd.DataFrame(columns=["Language", "Word"])
 
-# Load data
+# Load the wordbank
 df = load_wordbank()
 
-# ——— Page config & title ———
+# ——— Page config & header ———
 st.set_page_config(page_title="Ecolinguist Show Wordbank", layout="wide")
 st.title("📚 Ecolinguist Show Wordbank")
 st.markdown("Search words used in past episodes and avoid repetition.")
 
-# ——— Sidebar: select language ———
+# ——— Sidebar: language selection ———
 languages = sorted(df["Language"].unique())
 lang = st.sidebar.selectbox("🔤 Select language", languages)
 
-# ——— Main: word lookup ———
+# ——— Main: word lookup UI ———
 st.subheader(f"Check a word in **{lang}** episodes")
 query = st.text_input("Enter the word to check:")
 
@@ -48,7 +54,7 @@ if query:
     else:
         st.warning(f"❌ **'{query}'** has **not** been used yet.")
 
-# ——— Expander: show full list for that language ———
+# ——— Expander: full list for the selected language ———
 with st.expander(f"📖 All words in {lang}"):
     st.dataframe(
         df[df["Language"] == lang]
