@@ -2,27 +2,38 @@ import glob
 import pandas as pd
 import streamlit as st
 
+# ——— Robust loader to skip bad CSVs ———
 @st.cache_data
 def load_wordbank():
-    files = glob.glob("data/*.csv")
-    dfs = []
-    for f in files:
-        df = pd.read_csv(f)
-        # Ensure consistent column names:
-        df = df.rename(columns={df.columns[0]: "Language", df.columns[1]: "Word"})
-        dfs.append(df[["Language", "Word"]])
-    return pd.concat(dfs, ignore_index=True)
+    tables = []
+    for path in glob.glob("data/*.csv"):
+        df = pd.read_csv(path)
+        # Skip files with fewer than 2 columns
+        if len(df.columns) < 2:
+            st.warning(f"Skipped {path}: needs ≥2 columns, found {len(df.columns)}")
+            continue
+        # Keep only first two columns and standardize names
+        df = df.iloc[:, :2]
+        df.columns = ["Language", "Word"]
+        tables.append(df)
+    if tables:
+        return pd.concat(tables, ignore_index=True)
+    # Fallback to empty DataFrame
+    return pd.DataFrame(columns=["Language", "Word"])
 
+# Load data
 df = load_wordbank()
 
-st.set_page_config(page_title="Ecolinguist Wordbank", layout="wide")
+# ——— Page config & title ———
+st.set_page_config(page_title="Ecolinguist Show Wordbank", layout="wide")
 st.title("📚 Ecolinguist Show Wordbank")
+st.markdown("Search words used in past episodes and avoid repetition.")
 
-# Sidebar for language selection
+# ——— Sidebar: select language ———
 languages = sorted(df["Language"].unique())
 lang = st.sidebar.selectbox("🔤 Select language", languages)
 
-# Word lookup
+# ——— Main: word lookup ———
 st.subheader(f"Check a word in **{lang}** episodes")
 query = st.text_input("Enter the word to check:")
 
@@ -37,6 +48,10 @@ if query:
     else:
         st.warning(f"❌ **'{query}'** has **not** been used yet.")
 
-# Show full list
+# ——— Expander: show full list for that language ———
 with st.expander(f"📖 All words in {lang}"):
-    st.dataframe(df[df["Language"] == lang].sort_values("Word").reset_index(drop=True))
+    st.dataframe(
+        df[df["Language"] == lang]
+          .sort_values("Word")
+          .reset_index(drop=True)
+    )
